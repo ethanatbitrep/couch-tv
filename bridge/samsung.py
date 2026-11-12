@@ -110,6 +110,9 @@ class SamsungTV:
         self._tv_answers = {}
         # Open couch-tv when the TV comes on ("open_on_power_on": false to stop it).
         self.open_on_power_on = cfg.get("open_on_power_on", True) is not False
+        # "always": open couch-tv even when the TV came back straight into an app (Samsung's Autorun
+        # Last App reopening Netflix, say). Left out or true: an app that came back is left alone.
+        self.open_over_apps = cfg.get("open_on_power_on") == "always"
         self.remote_name = cfg.get("remote_name") or config.CLIENT_NAME
         self.token_file = os.path.join(config.DATA, f"samsung-{self.id}-token.txt")
         # Paired means the TV has said Allow once (a token is kept). Keys need it; the rest does not.
@@ -409,7 +412,7 @@ class SamsungTV:
         if front == self.app_id:
             self._note("TV came on, couch-tv already open")
             return
-        if front:
+        if front and not self.open_over_apps:
             self._note(f"TV came on in {self._package_of(front)}, left alone")
             return
         try:

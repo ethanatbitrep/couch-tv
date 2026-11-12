@@ -218,7 +218,8 @@ screen (the TV is on live TV, an HDMI input or Samsung's menu) it opens couch-tv
 (`POST http://<tv>:8001/api/v2/applications/<app id>`; the remote's `ed.apps.launch` is the fallback). If the TV came back straight into an app (some TVs reopen the last app),
 it is left alone. Anything the phone remote or Claude just asked for also wins: the hook stays quiet
 for 20 seconds after any command, except a power press, so turning the TV on from the phone also
-lands on couch-tv. `"open_on_power_on": false` in `config.json` turns the hook off.
+lands on couch-tv. `"open_on_power_on": false` in `config.json` turns the hook off, and `"open_on_power_on": "always"` opens
+couch-tv even when the TV came back straight into an app (Autorun Last App reopening Netflix, say).
 
 The REST launch is tried up to three times, a second apart, because the first call just after
 power on can fail with "Server disconnected". The log then says whether couch-tv really came

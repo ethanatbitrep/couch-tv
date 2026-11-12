@@ -383,6 +383,8 @@
     NIGHT = THEME === "night";
     OLED = THEME === "oled";
     document.documentElement.classList.toggle("theme-night", NIGHT);
+    SCENIC = NIGHT && (HOME.scenic === true || (MOCK && /[?&]scenic=1/.test(Q)));
+    document.documentElement.classList.toggle("scenic", SCENIC);
     document.documentElement.classList.toggle("theme-oled", OLED);
     GLASS = glassSetting();
     document.documentElement.classList.toggle("glass", GLASS !== "off");
@@ -610,7 +612,9 @@
     var hm = CLOCK24 ? (h < 10 ? "0" : "") + h + ":" + mm : (h % 12 || 12) + ":" + mm;
     $("time").innerHTML = hm + (CLOCK24 ? "" : "<small>" + esc(h < 12 ? t("am") : t("pm")) + "</small>");
     var loc = window.I18N ? window.I18N.locale() : "en-AU";
-    var day = d.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long" }).replace(",", "");
+    if (SCENIC && /^en\b/.test(loc)) loc = "en-US";
+    var day = d.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long" });
+    if (!SCENIC) day = day.replace(",", "");
     day = day.charAt(0).toUpperCase() + day.slice(1);   // "lunes 27 de octubre" starts a line on screen
     var w = NIGHT && WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
     $("date").innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + wxIcon(w) + esc(tempText(w.temp)) +
@@ -1018,17 +1022,25 @@
   // the MTA's feeds; with no bridge (offline) or no stations the card stays hidden. NYC only, so
   // the words are English.
   var SUBWAY_ON = false, SUBWAY_EVERY = 20000, subwayData = null, subwayAt = 0;
+  // home.scenic: the Scenic look (Ethan's pick of four mocks): the Night scenes with flat dark panels,
+  // a plain clock, app logos on Keep watching and a wider dock. Off unless set. Preview: ?mock=1&scenic=1
+  var SCENIC = false;
   var LINE_COLOR = { A: "#0039A6", C: "#0039A6", E: "#0039A6", B: "#FF6319", D: "#FF6319", F: "#FF6319", M: "#FF6319",
     G: "#6CBE45", J: "#996633", Z: "#996633", L: "#A7A9AC", N: "#FCCC0A", Q: "#FCCC0A", R: "#FCCC0A", W: "#FCCC0A",
     S: "#808183", "1": "#EE352E", "2": "#EE352E", "3": "#EE352E", "4": "#00933C", "5": "#00933C", "6": "#00933C", "7": "#B933AD" };
   var LINE_DARK = { N: 1, Q: 1, R: 1, W: 1 };   // the yellow lines take black letters, as on the platform signs
+  function subwayBullet(line) {
+    return '<span class="sw-bullet' + (LINE_DARK[line] ? " sw-dark" : "") + '" style="background:' + (LINE_COLOR[line] || "#808183") + '">' + esc(line) + "</span>";
+  }
   function subwayRow(label, trains) {
-    var cells = (trains || []).map(function (tr) {
-      var line = String(tr.line || "").toUpperCase();
-      return '<span class="sw-train"><span class="sw-bullet' + (LINE_DARK[line] ? " sw-dark" : "") + '" style="background:' +
-        (LINE_COLOR[line] || "#808183") + '">' + esc(line) + '</span><b>' + (tr.min < 1 ? "now" : esc(tr.min)) + '</b></span>';
-    }).join("");
-    return '<div class="sw-row"><span class="sw-dir">' + label + '</span>' + (cells || '<span class="sw-none">No trains</span>') + '</div>';
+    trains = trains || [];
+    if (!trains.length) return '<div class="sw-row"><span class="sw-dir">' + label + '</span><span class="sw-none">No trains</span></div>';
+    var first = trains[0], line = String(first.line || "").toUpperCase();
+    var rest = trains.slice(1), same = rest.every(function (tr) { return String(tr.line || "").toUpperCase() === line; });
+    var then = rest.map(function (tr) { return (same ? "" : String(tr.line || "").toUpperCase() + " ") + esc(tr.min); }).join(" · ");
+    return '<div class="sw-row"><span class="sw-dir">' + label + "</span>" + subwayBullet(line) +
+      '<b class="sw-next">' + (first.min < 1 ? "Now" : esc(first.min) + " min") + "</b>" +
+      (then ? '<span class="sw-then">' + then + "</span>" : "") + "</div>";
   }
   function renderSubway() {
     var el = $("subway");
@@ -1916,6 +1928,7 @@
     // some TVs, issue #23) it is the only way to say who is watching before anything is played.
     $("shelf-section").classList.toggle("empty", !anyone && !(NIGHT && npVisible()));
     renderPeople();
+    if (SCENIC) $("shelf-title").textContent = t("keep_watching") + (peopleCount() > 1 && PEOPLE[whoIndex()] ? " for " + PEOPLE[whoIndex()].name : "");
     if (!KW_ON) { track.innerHTML = ""; shelfEls = []; return; }   // row switched off: nothing to draw, the section is closed up
     if (!data.shows.length) {
       var name = PEOPLE[whoIndex()].name;
@@ -1927,6 +1940,7 @@
       // lock screen notifications: glass cards, three in view, the row slides past the third
       track.innerHTML = data.shows.map(function (it) {
         var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package;
+        if (SCENIC && pkg && iconUrl(pkg)) art = iconUrl(pkg);
         var ep = it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
         return '<div class="tile ncard">' +
           (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async">' : '<span class="thumb none"></span>') +
@@ -2391,7 +2405,11 @@
     if (NIGHT) {
       // the dock is as wide as what is in it; More apps uses all twelve columns
       GRID_COLS = expanded ? 12 : Math.max(1, Math.min(12, gridItems.length));
-      $("grid").style.gridTemplateColumns = "repeat(" + GRID_COLS + ", 7rem)";
+      $("grid").style.gridTemplateColumns = "repeat(" + GRID_COLS + ", " + (SCENIC ? "7.5rem" : "7rem") + ")";
+      if (SCENIC) {   // the dock runs edge to edge inside the safe area: 120 px tiles, the gaps share what is left
+        var gap = expanded || GRID_COLS < 2 ? 28 : Math.max(24, Math.min(56, Math.floor((1760 - 48 - GRID_COLS * 120) / (GRID_COLS - 1))));
+        $("grid").style.columnGap = $("grid").style.gridColumnGap = gap + "px";
+      }
     }
     $("grid").innerHTML = gridItems.map(appHTML).join("");
     gridEls = Array.prototype.slice.call($("grid").children);

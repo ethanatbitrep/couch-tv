@@ -412,6 +412,14 @@ anything outside Home Assistant.
 Preview with no TV and no Home Assistant: `?mock=1&ha=1` (see the end of this page). The doorbell
 card is drawn by the app itself, so it cannot be previewed in a browser.
 
+## The Scenic look (optional, `home.scenic`)
+
+`"home": { "scenic": true }` keeps the Night scenes but draws everything over them as flat dark panels
+with a hairline edge (no gradients or tints): a plain white clock under the date and weather, Keep
+watching titled for whoever is picked ("Keep watching for Ethan") with each app's logo as the
+picture, and a dock of 120 px tiles that runs the width of the screen. Preview:
+`tv-home/web/index.html?mock=1&scenic=1`.
+
 ## NYC subway arrivals (optional, `subway`)
 
 A card at the top right of the TV home with the next trains each way (uptown and downtown) at up to a
