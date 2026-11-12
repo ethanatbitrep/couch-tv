@@ -1788,13 +1788,9 @@ html:not(.kids-on) .kids { display: none; }
 .app .face img { border-radius: inherit; }
 
 /* ================= The Scenic look (home.scenic) =================
-   The Night scenes behind flat dark panels with a hairline edge, no gradients or tints, a plain
-   white clock in front of the scene, the app's logo on each Keep watching card and a dock that runs
-   the width of the screen. Built from the "A. Scenic" mock. */
-/* the photo alone is dimmed (a layer over the page would grey the clock too) */
-.scenic .scrim { background: none; }
-.scenic .scene .sbg { filter: brightness(0.62); }
-.scenic.night .scene .sbg { filter: brightness(0.5); }
+   The Night scenes, their glass clock behind the scenery and their date as they are, with flat
+   dark panels with a hairline edge (no gradients or tints), the app's logo on each Keep watching
+   card and a dock that runs the width of the screen. Built from the "A. Scenic" mock. */
 .scenic.theme-night .people, .scenic.theme-night .qbtn, .scenic.theme-night .grid, .scenic.theme-night .ncard {
   background: rgba(12, 12, 16, 0.66); -webkit-backdrop-filter: blur(1.5rem); backdrop-filter: blur(1.5rem);
   box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.14); }
@@ -1802,20 +1798,7 @@ html:not(.kids-on) .kids { display: none; }
 .scenic .person { font-size: 1.625rem; line-height: 3.5rem; padding: 0 1.75rem; border-radius: 1.75rem; }
 .scenic.theme-night .qbtn { min-width: 4.5rem; height: 4.5rem; padding: 0 1.25rem; border-radius: 2.25rem; }
 .scenic.theme-night .qbtn svg { width: 1.875rem; height: 1.875rem; }
-/* the date and weather on one line, the clock plain white under it, in front of the whole scene */
-.scenic.theme-night .date, .scenic.theme-night[class*="scene-"] .date { left: 0; right: 0; top: 6rem; text-align: center;
-  font-size: 2rem; line-height: 2.5rem; font-weight: 500; color: rgba(255, 255, 255, 0.92); text-shadow: 0 0.125rem 1rem rgba(0, 0, 0, 0.3); }
-.scenic.theme-night .date svg { display: none; }
-.scenic.theme-night .date .wx:before { content: " · "; }
-.scenic.theme-night .date .wx, .scenic.theme-night[class*="scene-"] .date .wx { color: rgba(255, 255, 255, 0.92); font-weight: 500; }
-.scenic .scene .fg { display: none; }
-.scenic .scene .gclock, .scenic.night .scene .gclock { left: 0; right: 0; top: 9rem; text-align: center; font-family: Inter, system-ui, sans-serif;
-  font-weight: 200; font-size: 16.25rem; line-height: 1; letter-spacing: -0.375rem; filter: none; }
-.scenic.theme-night .scene .gclock { opacity: 1; }
-.scenic .scene .gclock .fill { color: #fff; background-image: none !important; -webkit-background-clip: border-box; background-clip: border-box;
-  filter: none; opacity: 1; }
-.scenic .scene .gclock.under { display: none; }   /* the water scene's reflection copy */
-.scenic .scene .gclock .rim, .scenic .scene .gclock .sheen, .scenic .scene .gclock .edge { display: none; }
+/* the clock, the date and the photo stay the Night look's own: the glass clock behind the scenery */
 /* Keep watching: 540 x 152 cards, the app's logo as the picture */
 .scenic.theme-night .shelf-head h2 { font-size: 1.875rem; font-weight: 600; color: #fff; }
 .scenic .ncard { width: 33.75rem; height: 9.5rem; box-sizing: border-box; padding: 1rem; border-radius: 1.75rem; }
