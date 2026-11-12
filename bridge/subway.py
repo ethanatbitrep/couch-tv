@@ -41,14 +41,14 @@ STOP_FEEDS = {"1": ["gtfs"], "2": ["gtfs"], "3": ["gtfs"], "4": ["gtfs"], "5": [
               "J": ["gtfs-jz"], "L": ["gtfs-l"]}
 SHOW = {"6X": "6", "7X": "7", "FX": "F", "GS": "S", "FS": "S", "H": "S"}   # express variants keep their line's bullet
 EVERY = 20      # seconds between reads of a feed
-GONE = 30       # a train that left more than this many seconds ago is dropped
+GONE = 0        # a train is dropped once its departure time has passed
 
 _cfg = config.CONFIG.get("subway") or {}
 STATIONS = [s for s in (_cfg.get("stations") or []) if isinstance(s, dict) and s.get("stops")]
 COUNT = max(1, min(6, int(_cfg.get("count") or 3)))
 ENABLED = bool(STATIONS)
 
-_cache = {}   # feed -> (read at, [(route, stop_id, unix time), ...])
+_cache = {}   # feed -> (read at, [(route, stop_id, arrives, leaves), ...])
 _lock = asyncio.Lock()
 
 
@@ -92,7 +92,8 @@ def _time_of(event):   # StopTimeEvent: time = 2
 
 
 def parse_feed(data):
-    """FeedMessage bytes -> [(route_id, stop_id, unix time)] for every stop of every trip.
+    """FeedMessage bytes -> [(route_id, stop_id, arrives, leaves)] for every stop of every trip
+    (unix times; either one stands in for the other when the feed gives only one).
     FeedMessage.entity = 2; FeedEntity.trip_update = 3; TripUpdate.trip = 1, stop_time_update = 2;
     TripDescriptor.route_id = 5; StopTimeUpdate.arrival = 2, departure = 3, stop_id = 4."""
     out = []
@@ -117,11 +118,10 @@ def parse_feed(data):
                             arr = _time_of(v4)
                         elif n4 == 3 and wt4 == 2:
                             dep = _time_of(v4)
-                    t = arr or dep
-                    if stop and t:
-                        stops.append((stop, t))
+                    if stop and (arr or dep):
+                        stops.append((stop, arr or dep, dep or arr))
             if route:
-                out.extend((route, s, t) for s, t in stops)
+                out.extend((route, s, a, d) for s, a, d in stops)
     return out
 
 
@@ -168,9 +168,9 @@ async def arrivals():
         keep = {str(l).upper() for l in st.get("lines") or []}
         dirs = {"N": [], "S": []}
         for f in _feeds_for(st):
-            for route, stop, t in rows.get(f) or []:
+            for route, stop, t, leaves in rows.get(f) or []:
                 base, d = stop[:-1].upper(), stop[-1:].upper()
-                if base not in stops or d not in dirs or t < now - GONE:
+                if base not in stops or d not in dirs or leaves < now - GONE:
                     continue
                 line = SHOW.get(route, route)
                 if keep and line not in keep and route not in keep:
