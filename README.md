@@ -726,6 +726,9 @@ To keep the bridge running all the time, use `bridge/examples/couch-tv-bridge.pl
 (macOS) or `bridge/examples/couch-tv-bridge.service.example` (Linux). Both set `CLAUDE_BIN` and a
 `PATH`, because a background service does not see your shell's.
 To run it in Docker on a NAS instead, see [docs/DOCKER.md](docs/DOCKER.md).
+On a Mac, `scripts/mac-bridge-service.sh` does all of this in one go: it runs the bridge in the background
+from a small app bundle, so macOS's Local Network privacy lets it reach the TV (the fix below), and
+checks that it sees the TV. `scripts/mac-bridge-service.sh stop` takes it away again.
 
 If the macOS service logs `No route to host` while a bridge you start by hand works, that is
 macOS Local Network privacy, and the Local Network switch alone may not fix it for an interpreter
