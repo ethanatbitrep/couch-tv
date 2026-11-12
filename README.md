@@ -729,6 +729,10 @@ To run it in Docker on a NAS instead, see [docs/DOCKER.md](docs/DOCKER.md).
 On a Mac, `scripts/mac-bridge-service.sh` does all of this in one go: it runs the bridge in the background
 from a small app bundle, so macOS's Local Network privacy lets it reach the TV (the fix below), and
 checks that it sees the TV. `scripts/mac-bridge-service.sh stop` takes it away again.
+If that service still cannot reach the TV ("No route to host" in `/tmp/couch-tv-bridge.log`), run
+`scripts/mac-bridge-login.sh` instead: it runs the bridge in a Terminal window that opens by itself at
+every login (Terminal already has Local Network permission), restarts it if it stops, and keeps the
+Mac awake while it runs. `scripts/mac-bridge-login.sh stop` takes it away again.
 
 If the macOS service logs `No route to host` while a bridge you start by hand works, that is
 macOS Local Network privacy, and the Local Network switch alone may not fix it for an interpreter
