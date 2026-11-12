@@ -54,6 +54,15 @@
   // Tizen lists hundreds of system parts as apps (a 2021 TV: 437). Apps from Samsung's store have a
   // 10 character package id (Tubi is 3KA0pm7a7V); system ones are org.tizen.* or com.samsung.*.
   // A few store-installed extras are Samsung's own and stay hidden.
+  // An app whose id is not in the table (Prime Video on a 2019 TV runs an older app under another
+  // id) is matched by its name too, so it still gets its clean logo instead of the TV's own icon
+  // file, which some TVs do not let the home load.
+  function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+  var byName = {};
+  Object.keys(MAP).forEach(function (pkg) { if (MAP[pkg].name) byName[norm(MAP[pkg].name)] = pkg; });
+  var ALIAS = { amazonprimevideo: "com.amazon.amazonvideo.livingroom", amazonvideo: "com.amazon.amazonvideo.livingroom",
+    amazoninstantvideo: "com.amazon.amazonvideo.livingroom", primevideo: "com.amazon.amazonvideo.livingroom" };
+  function byNameOf(a) { var n = norm(a.name); var pkg = byName[n] || ALIAS[n]; return pkg && MAP[pkg] ? pkg : null; }
   var STORE = /^[A-Za-z0-9]{10}$/;
   var HIDE = /^(e-Manual|Security Center|Samsung Promotion|Smarthub Connection Test)$/i;
   var byPkg = {}, shown = [];
@@ -61,7 +70,7 @@
     byPkg = {}; shown = [];
     tizenApps.forEach(function (a) {
       if (a.id === SELF || a.packageId === SELF.split(".")[0]) return;
-      var pkg = byTizen[a.id] || byTizen[a.packageId];
+      var pkg = byTizen[a.id] || byTizen[a.packageId] || (a.show !== false && byNameOf(a));
       if (pkg && !byPkg[pkg]) {
         byPkg[pkg] = a;
         shown.push({ package: pkg, label: MAP[pkg].name || a.name });
