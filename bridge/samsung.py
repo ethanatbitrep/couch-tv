@@ -232,8 +232,17 @@ class SamsungTV:
             dev = (j or {}).get("device") or {}
             self.power = dev.get("PowerState") or "on"   # older TVs leave it out and only answer when on
             self.frame = str(dev.get("FrameTVSupport")).lower() == "true"
+            if getattr(self, "_read_err", None):
+                self.log.info("TV answering again at %s", self.ip)
+            self._read_err = None
             return True
-        except Exception:
+        except Exception as e:
+            # say why, once per change: "No route to host" under launchd is macOS Local Network
+            # privacy (#42), a timeout or a refused connection is the TV being off or asleep
+            err = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+            if err != getattr(self, "_read_err", None):
+                self._read_err = err
+                self.log.info("cannot read the TV at %s: %s", self.ip, err)
             self.power = None
             return False
 
