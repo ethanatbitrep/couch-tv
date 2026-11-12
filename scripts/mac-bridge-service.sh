@@ -3,8 +3,10 @@
 # so macOS's Local Network privacy lets it reach the TV. A Python started by launchd on its own can
 # be refused ("No route to host", or the TV just never seen) even with Python switched on under
 # System Settings, Privacy and Security, Local Network (#42; seen again on a Mac mini with
-# Homebrew's Python 3.14). The bundle gives the interpreter its own identity to ask for and keep
-# that permission.
+# Homebrew's Python 3.14). The bundle gives the interpreter its own identity, and launchd starts
+# it through `open` (LaunchServices), the way a double click does: only then does macOS show the
+# "find devices on your local network" prompt for it. Started directly by launchd, the bundle got
+# "No route to host" with no prompt and no entry under Local Network (the same Mac mini).
 #
 #   scripts/mac-bridge-service.sh          set it up (or again after a Python upgrade), start it
 #   scripts/mac-bridge-service.sh stop     stop it and take the LaunchAgent away
@@ -25,6 +27,7 @@ DOMAIN="gui/$(id -u)"
 # that window fails with "Bootstrap failed: 5: Input/output error" (seen on a Mac mini): wait for it
 launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
 for i in $(seq 1 20); do launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1 || break; sleep 0.5; done
+pkill -f "$EXE" 2>/dev/null || true   # the app outlives the `open` that launchd watches
 if [ "$1" = stop ]; then
   rm -f "$AGENT"
   echo "Stopped. The bridge no longer runs in the background."
@@ -53,6 +56,12 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleVersion</key><string>1</string>
   <key>LSUIElement</key><true/>
   <key>NSLocalNetworkUsageDescription</key><string>Couch TV talks to your TV on your home network.</string>
+  <key>LSEnvironment</key>
+  <dict>
+    <key>PYTHONHOME</key><string>$BASE</string>
+    <key>PYTHONPATH</key><string>$SITE</string>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
 </dict>
 </plist>
 EOF
@@ -71,24 +80,25 @@ cat > "$AGENT" <<EOF
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$EXE</string>
-    <string>$ROOT/bridge/server.py</string>
+    <string>/usr/bin/open</string>
+    <string>-W</string>
+    <string>-g</string>
+    <string>-n</string>
+    <string>--stdout</string><string>$LOG</string>
+    <string>--stderr</string><string>$LOG</string>
+    <string>-a</string><string>$APP</string>
+    <string>--args</string><string>$ROOT/bridge/server.py</string>
   </array>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-    <key>PYTHONHOME</key><string>$BASE</string>
-    <key>PYTHONPATH</key><string>$SITE</string>
-  </dict>
   <key>WorkingDirectory</key><string>$ROOT</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>$LOG</string>
-  <key>StandardErrorPath</key><string>$LOG</string>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>/tmp/couch-tv-bridge-launch.log</string>
+  <key>StandardErrorPath</key><string>/tmp/couch-tv-bridge-launch.log</string>
 </dict>
 </plist>
 EOF
-rm -f "$LOG"
+rm -f "$LOG" /tmp/couch-tv-bridge-launch.log
 ok=""
 for i in 1 2 3 4 5; do
   if launchctl bootstrap "$DOMAIN" "$AGENT" 2>/dev/null; then ok=1; break; fi
@@ -104,9 +114,14 @@ launchctl print "$DOMAIN/$LABEL" | grep -m1 "state =" || true
 cd "$ROOT"
 KEY=$("$VPY" -c 'import json; print((json.load(open("config.json")).get("bridge") or {}).get("pairing_key") or "")' 2>/dev/null || true)
 PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2); PORT=${PORT:-5400}
-OUT=$(curl -s -m 5 ${KEY:+-H "Authorization: Bearer $KEY"} "http://127.0.0.1:$PORT/api/tvs" || true)
+for i in $(seq 1 20); do
+  OUT=$(curl -s -m 5 ${KEY:+-H "Authorization: Bearer $KEY"} "http://127.0.0.1:$PORT/api/tvs" || true)
+  case "$OUT" in *'"connected": true'*) break ;; esac
+  [ "$i" = 3 ] && echo "Waiting for the TV (click Allow if macOS asks)..."
+  sleep 2
+done
 case "$OUT" in
   *'"connected": true'*) echo "TV: connected. All good." ;;
-  *'"connected": false'*) echo "TV: not seen yet. Make sure the TV is on, click Allow if macOS asked, then run this again." ;;
+  *'"connected": false'*) echo "TV: not seen yet. Make sure the TV is on, click Allow if macOS asked, then run this again. Last line of $LOG:"; tail -1 "$LOG" 2>/dev/null || true ;;
   *) echo "The bridge did not answer yet. Last lines of $LOG:"; tail -5 "$LOG" 2>/dev/null || true ;;
 esac
