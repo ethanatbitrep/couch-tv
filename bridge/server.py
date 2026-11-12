@@ -2107,6 +2107,19 @@ async def h_weather(request):
     return ok(**w)
 
 
+# ---------- NYC subway arrivals (config.json "subway", bridge/subway.py) ----------
+import subway  # noqa: E402
+
+
+async def h_subway(request):
+    if not subway.ENABLED:
+        raise ApiError(404, "No subway stations in config.json.")
+    got = await subway.arrivals()
+    if not got:
+        raise ApiError(503, "No subway times right now.")
+    return ok(**got)
+
+
 # ---------- app order, arranged from the phone ----------
 # The TV home reports the apps it has (home-apps.<tv>.json, in its default order); the phone saves
 # the order and where the "More apps" line sits (app-order.<tv>.json). Apps above the line show in
@@ -3519,6 +3532,7 @@ def make_app():
     r.add_post("/api/kids", h_kids_set)
     r.add_post("/api/who", h_who_set)
     r.add_get("/api/weather", h_weather)
+    r.add_get("/api/subway", h_subway)
     r.add_get("/api/config", h_config)
     r.add_post("/api/home-apps", h_home_apps)
     r.add_get("/api/app-order", h_app_order_get)

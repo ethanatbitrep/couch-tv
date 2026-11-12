@@ -1759,3 +1759,24 @@ html:not(.kids-on) .kids { display: none; }
 .kpin-hint { font-size: 1.125rem !important; color: var(--text-3) !important; margin-top: 0.25rem !important; }
 .lighter .kids, .old-engine .kids { background: #1d2140; }
 .lighter .ktile, .lighter .ktrack, .lighter .kapp, .lighter .kkey { transition: none; }
+
+/* ================= NYC subway card (config.json "subway") =================
+   Top right, under the quick buttons: the next trains each way at each station, with the line
+   bullets in the MTA's colors. Flat dark glass, no gradient. Hidden with no stations or no bridge. */
+.subway { display: none; }
+.subway.on { display: inline-block; margin-top: 1.75rem; padding: 1.125rem 1.5rem 0.75rem; text-align: left;
+  border-radius: 1.875rem; background: rgba(14, 14, 18, 0.62); text-shadow: none;
+  -webkit-backdrop-filter: blur(1.5rem); backdrop-filter: blur(1.5rem);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.14); }
+.sw-station + .sw-station { margin-top: 0.625rem; padding-top: 0.875rem; border-top: 0.0625rem solid rgba(255, 255, 255, 0.12); }
+.sw-name { margin: 0 0 0.25rem; font-size: 1.0625rem; line-height: 1.375rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: rgba(255, 255, 255, 0.62); white-space: nowrap; }
+.sw-row { display: flex; align-items: center; height: 2.875rem; white-space: nowrap; }
+.sw-dir { width: 7rem; flex: none; font-size: 1.1875rem; color: rgba(255, 255, 255, 0.72); }
+.sw-train { display: inline-flex; align-items: center; width: 6.75rem; }
+.sw-train:last-child { width: auto; }
+.sw-bullet { display: inline-flex; align-items: center; justify-content: center; width: 2.125rem; height: 2.125rem;
+  border-radius: 50%; font-size: 1.25rem; font-weight: 700; line-height: 1; color: #fff; }
+.sw-bullet.sw-dark { color: #111; }
+.sw-train b { margin-left: 0.5rem; font-size: 1.5rem; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
+.sw-none { font-size: 1.1875rem; color: rgba(255, 255, 255, 0.5); }

@@ -354,6 +354,7 @@
   function readConfig() {
     CFG = window.COUCH_CONFIG || {};
     HOME = CFG.home || {};
+    SUBWAY_ON = !OFFLINE && !!(CFG.subway && CFG.subway.enabled);
     ON_TV = CFG.mode === "on-tv";
     ST = loadSettings();
     KEEP_PHOTO = typeof ST.keep_photo === "boolean" ? ST.keep_photo : HOME.keep_photo === true;
@@ -1010,6 +1011,41 @@
       clock();
       updateAmbientWeather();
     }, function () {});
+  }
+
+  // ---------- NYC subway card (config.json "subway", bridge/subway.py) ----------
+  // The next trains each way at the stations in config.json, top right under the quick buttons. The bridge reads
+  // the MTA's feeds; with no bridge (offline) or no stations the card stays hidden. NYC only, so
+  // the words are English.
+  var SUBWAY_ON = false, SUBWAY_EVERY = 20000, subwayData = null, subwayAt = 0;
+  var LINE_COLOR = { A: "#0039A6", C: "#0039A6", E: "#0039A6", B: "#FF6319", D: "#FF6319", F: "#FF6319", M: "#FF6319",
+    G: "#6CBE45", J: "#996633", Z: "#996633", L: "#A7A9AC", N: "#FCCC0A", Q: "#FCCC0A", R: "#FCCC0A", W: "#FCCC0A",
+    S: "#808183", "1": "#EE352E", "2": "#EE352E", "3": "#EE352E", "4": "#00933C", "5": "#00933C", "6": "#00933C", "7": "#B933AD" };
+  var LINE_DARK = { N: 1, Q: 1, R: 1, W: 1 };   // the yellow lines take black letters, as on the platform signs
+  function subwayRow(label, trains) {
+    var cells = (trains || []).map(function (tr) {
+      var line = String(tr.line || "").toUpperCase();
+      return '<span class="sw-train"><span class="sw-bullet' + (LINE_DARK[line] ? " sw-dark" : "") + '" style="background:' +
+        (LINE_COLOR[line] || "#808183") + '">' + esc(line) + '</span><b>' + (tr.min < 1 ? "now" : esc(tr.min)) + '</b></span>';
+    }).join("");
+    return '<div class="sw-row"><span class="sw-dir">' + label + '</span>' + (cells || '<span class="sw-none">No trains</span>') + '</div>';
+  }
+  function renderSubway() {
+    var el = $("subway");
+    if (!el) return;
+    var fresh = subwayData && Date.now() - subwayAt < 180000;   // a last good read stays up to 3 minutes
+    el.classList.toggle("on", !!(SUBWAY_ON && fresh));
+    if (!SUBWAY_ON || !fresh) { el.innerHTML = ""; return; }
+    el.innerHTML = (subwayData.stations || []).map(function (st) {
+      return '<div class="sw-station"><p class="sw-name">' + esc(st.name) + '</p>' +
+        subwayRow("Uptown", st.uptown) + subwayRow("Downtown", st.downtown) + '</div>';
+    }).join("");
+  }
+  function refreshSubway() {
+    if (!SUBWAY_ON || document.hidden) return Promise.resolve();
+    return api("GET", "/api/subway", null, 10000).then(function (j) {
+      subwayData = j; subwayAt = Date.now(); renderSubway();
+    }, function () { renderSubway(); });
   }
 
   // Open-Meteo (free, no key), the same call the bridge makes. The words come from i18n.js.
@@ -4374,6 +4410,11 @@
       if (document.fonts) document.fonts.load("300 10px Antonio").then(function () { glassShown = ""; clock(); });
       refreshWeather();
       setInterval(refreshWeather, WX_EVERY * 60000);
+    }
+    if (SUBWAY_ON) {
+      refreshSubway();
+      setInterval(refreshSubway, SUBWAY_EVERY);
+      document.addEventListener("visibilitychange", function () { if (!document.hidden) refreshSubway(); });
     }
     photo = photoForHour(new Date().getHours());
     showPhoto();

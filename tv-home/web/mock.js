@@ -116,6 +116,8 @@
       { id: "ruby", name: "Ruby", colour: "#ff9f0a", kid: true, kids_mode: { shows: shelf, apps: KIDS.apps,
         pin_hash: KIDS.pin_hash, pin_salt: KIDS.pin_salt, pin_rounds: KIDS.pin_rounds } }]);
   }
+  // ?subway=1: the NYC subway card (config.json "subway") with made-up times
+  if (arg("subway")) cfg.subway = { enabled: true };
   window.COUCH_CONFIG = cfg;
 
   // ---------- the launcher's updater (Updater.kt), for ?update= ----------
@@ -245,6 +247,11 @@
       setTimeout(function () {
         if (down) return reject(new Error("The computer isn't answering."));
         // Now playing (#31): ?music=1, a song that previous and next step through, play and pause toggle
+        if (path.indexOf("/api/subway") === 0) return resolve({ ok: true, at: Math.floor(Date.now() / 1000), stations: [
+          { name: "W 4 St", uptown: [{ line: "A", min: 2 }, { line: "D", min: 5 }, { line: "C", min: 11 }],
+            downtown: [{ line: "E", min: 0 }, { line: "F", min: 6 }, { line: "A", min: 9 }] },
+          { name: "Christopher St", uptown: [{ line: "1", min: 3 }, { line: "1", min: 9 }, { line: "1", min: 15 }],
+            downtown: [{ line: "1", min: 1 }, { line: "1", min: 7 }, { line: "1", min: 14 }] }] });
         if (path.indexOf("/api/music") === 0) return resolve({ ok: true, music: arg("music") ? mockSong() : null });
         if (path.indexOf("/api/key") === 0) {
           var k = body && body.key;

@@ -412,6 +412,32 @@ anything outside Home Assistant.
 Preview with no TV and no Home Assistant: `?mock=1&ha=1` (see the end of this page). The doorbell
 card is drawn by the app itself, so it cannot be previewed in a browser.
 
+## NYC subway arrivals (optional, `subway`)
+
+A card at the top right of the TV home with the next trains each way (uptown and downtown) at up to a
+few stations, with the line bullets in the MTA's colors. The bridge reads the MTA's public realtime
+feeds (no key, nothing to install) at most every 20 seconds and the home asks it every 20 seconds.
+Needs the bridge: with no bridge, or no `subway` section, there is no card.
+
+```json
+"subway": {
+  "stations": [
+    { "name": "W 4 St", "stops": ["A32", "D20"] },
+    { "name": "Christopher St", "stops": ["133"] }
+  ],
+  "count": 3
+}
+```
+
+- `stations`: each has a `name` to show and its GTFS `stops` (the stop ids in the MTA's static GTFS
+  `stops.txt`, without the N or S at the end). A station with two lines underneath (W 4 St has the
+  8 Av A C E at `A32` and the 6 Av B D F M at `D20`) lists both. Optional `lines`, for example
+  `["1"]`, keeps only those lines.
+- `count` [`3`]: trains shown each way, 1 to 6.
+
+Preview it without a bridge: `tv-home/web/index.html?mock=1&subway=1`. The bridge's answer is at
+`GET /api/subway`.
+
 ## Everything else
 
 **Never forward a port to the bridge.** The bridge is built for your home network only. Never expose it
