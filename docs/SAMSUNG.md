@@ -191,7 +191,7 @@ says "Connection reset by peer" on port 8002, try again and the prompt shows.
 
 ## How the hook works
 
-`bridge/samsung.py` asks the TV every 2 seconds, on its own network ports, which need no pairing:
+`bridge/samsung.py` asks the TV every second, on its own network ports, which need no pairing:
 
 - `http://<tv>:8001/api/v2/` gives the power state (`on` or `standby`). This is the only thing read
   on a timer.

@@ -12,7 +12,7 @@ turns them into Samsung app ids. Four channels, all on the home network:
 - UPnP on 9197 (no pairing): the volume level and mute, read once after a volume or mute key.
 A Frame TV also gets the art channel (8002, no prompt), to tell Art Mode from watching TV.
 
-The hook: a watcher checks the TV every 2 seconds (one request, GET /api/v2/). When the TV comes on (from standby, or a Frame
+The hook: a watcher checks the TV every second (one request, GET /api/v2/). When the TV comes on (from standby, or a Frame
 leaving Art Mode) and no app is on screen, it opens the couch-tv app (samsung/ in this repo). That
 is how a Samsung "looks for" couch-tv every time it is switched on. It is an app that opens itself,
 not a true home screen: Samsung's own Home button still opens Samsung's menu.
@@ -48,6 +48,7 @@ VISIBLE_FRESH = 30
 # switched off says PowerState "standby" before it leaves the network, so "off" is that, or gone
 # for this long (#53: a 20 second dropout opened couch-tv over a football game).
 GONE_MEANS_OFF = 120
+WATCH_SECONDS = 1   # the power read only: the reads that made a Q60B blip its sound (#53) stay off the timer
 
 KEYS = {
     "up": "KEY_UP", "down": "KEY_DOWN", "left": "KEY_LEFT", "right": "KEY_RIGHT",
@@ -336,7 +337,7 @@ class SamsungTV:
                     self._gone_since = None
                 elif self._gone_since is None:
                     self._gone_since = time.monotonic()
-                if not self.connected and ticks % 30 == 0:
+                if not self.connected and ticks % 60 == 0:
                     await self._resolve()   # it may have come back on a new address
                 if self.connected:
                     if self.frame and (self._art_task is None or self._art_task.done()):
@@ -373,7 +374,7 @@ class SamsungTV:
             except Exception as e:
                 self.log.warning("watch: %s %s", type(e).__name__, e)
             ticks += 1
-            await asyncio.sleep(2)
+            await asyncio.sleep(WATCH_SECONDS)
 
     def _note(self, what):
         self.log.info("hook: %s", what)
@@ -383,13 +384,15 @@ class SamsungTV:
         """The TV just came on. If nothing else is on screen, open couch-tv."""
         if not self.open_on_power_on:
             return
-        if time.monotonic() - self._hook_at < 15:
-            return   # the art channel and the watcher both saw the same switch-on
+        # the art channel and the watcher both see a Frame's switch-on; other TVs only the watcher,
+        # so a quick off and on a few seconds later is a real second switch-on
+        if time.monotonic() - self._hook_at < (15 if self.frame else 5):
+            return
         self._hook_at = time.monotonic()
         if time.monotonic() < self.quiet_until:
             self._note("TV came on, left alone (a command is running)")
             return
-        await asyncio.sleep(1.5)   # let the TV settle on whatever it opens by itself
+        await asyncio.sleep(0.5)   # let the TV settle on whatever it opens by itself
         if time.monotonic() < self.quiet_until:   # a phone command landed while it settled
             self._note("TV came on, left alone (a command is running)")
             return
@@ -401,7 +404,11 @@ class SamsungTV:
             self._note(f"TV came on in {self._package_of(front)}, left alone")
             return
         try:
+            quiet = self.quiet_until
             how = await self._launch_tizen(self.app_id)
+            # The hook's own launch is not a command to wait out: without this, switching the TV
+            # off and on again within 20 seconds left Samsung's screen up ("a command is running").
+            self.quiet_until = quiet
             await asyncio.sleep(3)
             if await self._front() == self.app_id:
                 self._note(f"TV came on, opened couch-tv ({how})")
