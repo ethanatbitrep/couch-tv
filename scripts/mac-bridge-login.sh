@@ -18,7 +18,15 @@ pkill -f "CouchTVBridge.app/Contents/MacOS/couch-tv-bridge" 2>/dev/null || true
 pkill -f "couch-tv-bridge.command" 2>/dev/null || true
 pkill -f "$ROOT/.venv/bin/python bridge/server.py" 2>/dev/null || true
 pkill -f ".venv/bin/python bridge/server.py" 2>/dev/null || true
-sleep 2
+# and whatever still holds the port (an app the old service started through open outlives it)
+PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2); PORT=${PORT:-5400}
+for i in 1 2 3 4 5; do
+  PIDS=$(lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true)
+  [ -z "$PIDS" ] && break
+  kill $PIDS 2>/dev/null || true
+  sleep 1
+done
+sleep 1
 
 osascript -e "tell application \"System Events\" to delete (every login item whose name is \"$NAME\")" >/dev/null 2>&1 || true
 if [ "$1" = stop ]; then
@@ -37,7 +45,6 @@ fi
 # 3. start it now, and check it sees the TV
 open -a Terminal "$CMD"
 KEY=$(.venv/bin/python -c 'import json; print((json.load(open("config.json")).get("bridge") or {}).get("pairing_key") or "")' 2>/dev/null || true)
-PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d= -f2); PORT=${PORT:-5400}
 for i in $(seq 1 15); do
   sleep 2
   OUT=$(curl -s -m 3 ${KEY:+-H "Authorization: Bearer $KEY"} "http://127.0.0.1:$PORT/api/tvs" || true)
