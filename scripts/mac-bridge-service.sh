@@ -21,7 +21,10 @@ DOMAIN="gui/$(id -u)"
 
 [ "$(uname)" = Darwin ] || { echo "This is for macOS only."; exit 1; }
 
+# bootout returns before launchd has finished taking the old service away, and a bootstrap in
+# that window fails with "Bootstrap failed: 5: Input/output error" (seen on a Mac mini): wait for it
 launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
+for i in $(seq 1 20); do launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1 || break; sleep 0.5; done
 if [ "$1" = stop ]; then
   rm -f "$AGENT"
   echo "Stopped. The bridge no longer runs in the background."
@@ -86,8 +89,13 @@ cat > "$AGENT" <<EOF
 </plist>
 EOF
 rm -f "$LOG"
-sleep 1
-launchctl bootstrap "$DOMAIN" "$AGENT"
+ok=""
+for i in 1 2 3 4 5; do
+  if launchctl bootstrap "$DOMAIN" "$AGENT" 2>/dev/null; then ok=1; break; fi
+  launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1 && { ok=1; break; }   # it is in after all
+  sleep 2
+done
+[ -n "$ok" ] || { echo "macOS would not start it. Run this again in a minute; if it still fails, send the output of: plutil -lint \"$AGENT\""; exit 1; }
 echo "Started. If macOS asks to let \"Couch TV bridge\" find devices on your local network, click Allow."
 sleep 6
 launchctl print "$DOMAIN/$LABEL" | grep -m1 "state =" || true
