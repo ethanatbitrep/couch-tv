@@ -336,6 +336,11 @@ def _home(h):
     # temperature unit for the weather: c or f (#56). Home settings on the TV win over it.
     if h.get("wx_unit") in ("c", "f"):
         out["wx_unit"] = h["wx_unit"]
+    # the Scenic look, and its weather strip and Spotify row (docs/CONFIG.md, scenic and cards)
+    if isinstance(h.get("scenic"), bool):
+        out["scenic"] = h["scenic"]
+    if isinstance(h.get("cards"), list):
+        out["cards"] = [c for c in h["cards"] if c in ("weather", "spotify")]
     # Now playing on or off (#31), and the navigation sound: the TV's own, soft or off (#32)
     if isinstance(h.get("now_playing"), bool):
         out["now_playing"] = h["now_playing"]
