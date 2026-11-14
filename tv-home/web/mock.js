@@ -247,6 +247,20 @@
       setTimeout(function () {
         if (down) return reject(new Error("The computer isn't answering."));
         // Now playing (#31): ?music=1, a song that previous and next step through, play and pause toggle
+        if (path.indexOf("/api/weather/detail") === 0) return resolve({ ok: true,
+          now: { temp: 8.9, feels: 6.7, code: 3, text: "Cloudy", is_day: false, wind_mph: 9 }, today: { high: 11.7, low: 6.7 },
+          hours: [{ label: "8 PM", temp: 8.3, code: 3, pop: 10 }, { label: "9 PM", temp: 7.8, code: 3, pop: 20 }, { label: "10 PM", temp: 7.2, code: 61, pop: 60 },
+            { label: "11 PM", temp: 7.2, code: 63, pop: 70 }, { label: "12 AM", temp: 6.7, code: 61, pop: 50 }, { label: "1 AM", temp: 6.1, code: 3, pop: 10 }],
+          days: [{ label: "Sun", temp_high: 10.6, temp_low: 4.4, code: 61, pop: 80 }, { label: "Mon", temp_high: 12.8, temp_low: 6.1, code: 2, pop: 20 },
+            { label: "Tue", temp_high: 9.4, temp_low: 3.3, code: 0, pop: 0 }], note: "Rain likely after 10 PM" });
+        if (path.indexOf("/api/spotify") === 0 && method === "GET") return resolve({ ok: true, connected: true,
+          now: { name: "Espresso", artists: "Sabrina Carpenter", art: "", is_playing: true, progress_ms: 70000, duration_ms: 175000, uri: "spotify:track:a" },
+          recent: [{ name: "Espresso", artists: "Sabrina Carpenter", uri: "spotify:track:a", art: "" },
+            { name: "Not Like Us", artists: "Kendrick Lamar", uri: "spotify:track:b", art: "" },
+            { name: "Good Luck, Babe!", artists: "Chappell Roan", uri: "spotify:track:c", art: "" },
+            { name: "Run Club", artists: "Your playlist", uri: "spotify:track:d", art: "" },
+            { name: "Daylist", artists: "Made for you", uri: "spotify:track:e", art: "" }] });
+        if (path.indexOf("/api/spotify") === 0) return resolve({ ok: true });
         if (path.indexOf("/api/subway") === 0) return resolve({ ok: true, at: Math.floor(Date.now() / 1000), stations: [
           { name: "W 4 St", uptown: [{ line: "A", min: 2 }, { line: "D", min: 5 }, { line: "C", min: 11 }],
             downtown: [{ line: "E", min: 0 }, { line: "F", min: 6 }, { line: "A", min: 9 }] },

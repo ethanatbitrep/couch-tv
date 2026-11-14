@@ -355,6 +355,9 @@
     CFG = window.COUCH_CONFIG || {};
     HOME = CFG.home || {};
     SUBWAY_ON = !OFFLINE && !!(CFG.subway && CFG.subway.enabled);
+    CARDS = HOME.cards || (MOCK && /[?&]cards=1/.test(Q) ? ["weather", "spotify"] : []);
+    WXC_ON = !OFFLINE && CARDS.indexOf("weather") >= 0;
+    SPOT_ON = !OFFLINE && CARDS.indexOf("spotify") >= 0 && !!((CFG.spotify && CFG.spotify.enabled) || MOCK);
     ON_TV = CFG.mode === "on-tv";
     ST = loadSettings();
     KEEP_PHOTO = typeof ST.keep_photo === "boolean" ? ST.keep_photo : HOME.keep_photo === true;
@@ -1013,6 +1016,7 @@
     return (direct ? weatherDirect() : api("GET", "/api/weather")).then(function (j) {
       data.weather = j;
       clock();
+      if (WXC_ON) renderWxCard();
       updateAmbientWeather();
     }, function () {});
   }
@@ -1058,6 +1062,105 @@
     return api("GET", "/api/subway", null, 10000).then(function (j) {
       subwayData = j; subwayAt = Date.now(); renderSubway();
     }, function () { renderSubway(); });
+  }
+
+  // ---------- The Scenic bottom cards: detailed weather and Spotify (home.cards) ----------
+  // Ethan's "B" mock: two wide cards above the dock, where Keep watching sat (a Samsung has none).
+  // home.cards lists them: "weather" (the bridge's /api/weather/detail) and "spotify" (bridge/spotify.py:
+  // recently played and now playing, played on the TV's Spotify app). Each shows only with its data;
+  // Spotify also needs config.json "spotify". Preview: ?mock=1&scenic=1&cards=1
+  var CARDS = [], WXC_ON = false, SPOT_ON = false, wxDetail = null, spot = null, spEls = [], spI = 0, spotBusy = false;
+  var WX_ICON = {
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
+    moon: '<path d="M20 13.5A8 8 0 1 1 10.5 4a6.2 6.2 0 0 0 9.5 9.5z"/>',
+    partly: '<circle cx="8.5" cy="8.5" r="3"/><path d="M8.5 2.5v1.2M3.7 3.7l.9.9M2.5 8.5h1.2"/><path d="M9 19h8.5a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.4 1.5A2.8 2.8 0 0 0 9 19z"/>',
+    cloud: '<path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.6A3.3 3.3 0 0 0 7 18z"/>',
+    fog: '<path d="M4 9h16M3 13h18M5 17h14"/>',
+    rain: '<path d="M7 15h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M9 18l-1 2.5M13 18l-1 2.5M17 18l-1 2.5"/>',
+    snow: '<path d="M7 15h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M9 18.5h.01M13 19.5h.01M17 18.5h.01M11 21h.01M15 21h.01"/>',
+    storm: '<path d="M7 15h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M13 15l-2 3.5h3L12 22"/>'
+  };
+  function wxKind(code, day) {
+    if (code === 0 || code === 1) return day === false ? "moon" : "sun";
+    if (code === 2) return "partly";
+    if (code === 45 || code === 48) return "fog";
+    if (code >= 95) return "storm";
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "snow";
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return "rain";
+    return "cloud";
+  }
+  function wxIcon(code, day, cls) {
+    return '<svg class="' + (cls || "wxi") + '" viewBox="0 0 24 24" aria-hidden="true">' + WX_ICON[wxKind(code, day)] + "</svg>";
+  }
+  function deg(c) { return c == null ? "" : (WX_F ? Math.round(c * 9 / 5 + 32) : Math.round(c)) + "°"; }
+  function renderWxCard() {
+    var el = $("wxcard"), w = wxDetail;
+    var on = WXC_ON && !!(w && w.now);
+    el.classList.toggle("on", on);
+    if (!on) { el.innerHTML = ""; return; }
+    // Ethan's "D" mock: one line (now, how it feels, the heads up) over six hour pills, centred under the clock
+    var n = w.now;
+    var hours = (w.hours || []).slice(0, 6).map(function (h) {
+      return '<div class="wx-hour"><span class="wx-hl">' + esc(h.label) + "</span>" + wxIcon(h.code, null, "wxi wx-hicon") +
+        "<b>" + deg(h.temp) + '</b><span class="wx-pop">' + (h.pop >= 20 ? esc(h.pop) + "%" : "") + "</span></div>";
+    }).join("");
+    el.innerHTML = '<p class="wx-line">' + deg(n.temp) + " " + esc(wxText(n)) + " · Feels like " + deg(n.feels) +
+      (w.note ? ' · <span class="wx-note">' + esc(w.note.replace(" likely", "")) + "</span>" : "") + "</p>" +
+      '<div class="wx-hours">' + hours + "</div>";
+  }
+  function refreshWxCard() {
+    if (!WXC_ON || document.hidden) return Promise.resolve();
+    return api("GET", "/api/weather/detail", null, 10000).then(function (j) { wxDetail = j; renderWxCard(); }, function () { renderWxCard(); });
+  }
+
+  var SP_ICON = { prev: '<path d="M18 6v12L9 12zM6 6v12"/>', next: '<path d="M6 6v12l9-6zM18 6v12"/>',
+    pause: '<path d="M8 5v14M16 5v14"/>', play: '<path d="M7 5l12 7-12 7z"/>' };
+  function spSvg(k) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + SP_ICON[k] + "</svg>"; }
+  function artistsOf(x) { return Array.isArray(x.artists) ? x.artists.join(", ") : (x.artists || x.artist || ""); }
+  function spotReach() { return SPOT_ON && spEls.length > 0 && !expanded; }
+  function renderSpotCard() {
+    var el = $("spcard");
+    var on = SPOT_ON && !!(spot && spot.connected && ((spot.recent && spot.recent.length) || spot.now));
+    el.classList.toggle("on", on);
+    document.documentElement.classList.toggle("has-cards", SCENIC && (el.classList.contains("on") || $("wxcard").classList.contains("on")));
+    if (!on) { el.innerHTML = ""; spEls = []; if (zone === "spot") { zone = "grid"; paintFocus(); } return; }
+    var now = spot.now, recent = spot.recent || [];
+    var top = now || recent[0], playing = !!(now && now.is_playing);
+    var pct = now && now.duration_ms ? Math.min(100, Math.round(100 * now.progress_ms / now.duration_ms)) : 0;
+    var jump = recent.filter(function (r) { return !top || r.uri !== top.uri; }).slice(0, 4);
+    // Ethan's "D" mock: the song card with its buttons, then JUMP BACK IN and four cover tiles, all in one row
+    el.innerHTML = '<div class="sp-now">' +
+      (top && top.art ? '<img class="sp-art" src="' + esc(top.art) + '" alt="">' : '<span class="sp-art"></span>') +
+      '<div class="sp-say"><span class="sp-lab">' + (now ? (playing ? "NOW PLAYING" : "PAUSED") : "LAST PLAYED") + "</span>" +
+      "<b>" + esc(top ? top.name : "") + "</b><span>" + esc(top ? artistsOf(top) : "") + "</span>" +
+      (now ? '<span class="sp-bar"><i style="width:' + pct + '%"></i></span>' : "") + "</div>" +
+      '<div class="sp-ctl"><span class="sp-btn" data-act="previous" role="button" aria-label="Previous">' + spSvg("prev") + "</span>" +
+      '<span class="sp-btn sp-main" data-act="' + (playing ? "pause" : now ? "play" : "first") + '" role="button" aria-label="' + (playing ? "Pause" : "Play") + '">' + spSvg(playing ? "pause" : "play") + "</span>" +
+      '<span class="sp-btn" data-act="next" role="button" aria-label="Next">' + spSvg("next") + "</span></div></div>" +
+      (jump.length ? '<span class="sp-lab sp-jl">JUMP<br>BACK IN</span>' : "") + jump.map(function (r, i) {
+        return '<span class="sp-tile" data-i="' + i + '" role="button" aria-label="Play ' + esc(r.name) + '">' +
+          (r.art ? '<img src="' + esc(r.art) + '" alt="">' : "<span></span>") + '<span class="sp-tt"><b>' + esc(r.name) + "</b><i>" + esc(artistsOf(r)) + "</i></span></span>";
+      }).join("");
+    el._jump = jump; el._top = top;
+    spEls = [].slice.call(el.querySelectorAll(".sp-btn, .sp-tile"));
+    spI = Math.max(0, Math.min(spI, spEls.length - 1));
+    if (zone === "spot") paintFocus();
+  }
+  function refreshSpot() {
+    if (!SPOT_ON || document.hidden || spotBusy) return Promise.resolve();
+    return api("GET", "/api/spotify", null, 10000).then(function (j) { spot = j; renderSpotCard(); }, function () { renderSpotCard(); });
+  }
+  function spotActivate() {
+    var el = $("spcard"), b = spEls[spI];
+    if (!b) return;
+    var act = b.getAttribute("data-act"), i = b.getAttribute("data-i"), req;
+    if (i != null) { var r = el._jump[+i]; req = api("POST", "/api/spotify/play", { uri: r.uri, context_uri: r.context_uri || null }, 30000); }
+    else if (act === "first") { var t0 = el._top; req = api("POST", "/api/spotify/play", { uri: t0.uri, context_uri: t0.context_uri || null }, 30000); }
+    else req = api("POST", "/api/spotify/control", { action: act }, 10000);
+    // playing opens Spotify on the TV, which takes the screen: the card catches up when the home comes back
+    spotBusy = true;
+    b.classList.add("busy");
+    req.then(function () {}, function () {}).then(function () { spotBusy = false; b.classList.remove("busy"); setTimeout(refreshSpot, 800); });
   }
 
   // Open-Meteo (free, no key), the same call the bridge makes. The words come from i18n.js.
@@ -2450,7 +2553,7 @@
 
   // ---------------- focus ----------------
   function clearFocus() {
-    shelfEls.concat(gridEls, quickEls).forEach(function (el) { if (el) el.classList.remove("focus"); });
+    shelfEls.concat(gridEls, quickEls, spEls).forEach(function (el) { if (el) el.classList.remove("focus"); });
     $("people").classList.remove("focus");
     Array.prototype.forEach.call($("people").children, function (el) { el.classList.remove("focus"); });
   }
@@ -2487,6 +2590,11 @@
     if (zone === "menu") { renderMenu(); return; }
     if (zone === "inputs") { if (quickEls[qi]) quickEls[qi].classList.add("focus"); renderInputMenu(); return; }
     if (zone === "pmenu") { renderPop(); $("people").classList.add("focus"); return; }
+    if (zone === "spot") {
+      if (!spotReach()) { zone = "grid"; paintFocus(); return; }
+      spEls[spI].classList.add("focus");
+      return;
+    }
     if (zone === "np") {
       if (!npReach()) { zone = shelfEls.length ? "shelf" : "grid"; paintFocus(); return; }
       renderNp();
@@ -2566,7 +2674,8 @@
       return;
     }
     // Night with More apps open: the cards step aside, so up and down skip them
-    var cards = NIGHT && expanded ? [] : shelfEls;
+    // the Spotify row hides Keep watching (home.cards), so up and down skip the shows and stop on the row instead
+    var cards = (NIGHT && expanded) || document.documentElement.classList.contains("has-cards") ? [] : shelfEls;
     if (zone === "menu") {
       if (dx || dy) menuI = Math.max(0, Math.min(SLEEP_CHOICES.length - 1, menuI + (dy || dx)));
       paintFocus();
@@ -2579,6 +2688,17 @@
         pmi = n;
         renderPop();
       }
+      return;
+    }
+    if (zone === "spot") {
+      if (dx) spI = Math.max(0, Math.min(spEls.length - 1, spI + dx));
+      else if (dy < 0) { if (peopleOn()) toPeople(); else if (hasQuick()) { zone = "quick"; qi = 0; } }
+      else if (dy > 0 && gridEls.length) {
+        var sb = spEls[spI].getBoundingClientRect();
+        g = nearestInRow(0, sb.left + sb.width / 2);
+        zone = "grid";
+      }
+      paintFocus();
       return;
     }
     if (zone === "np") {
@@ -2612,6 +2732,7 @@
       else if (dy > 0) {
         if (!NIGHT && npReach()) zone = "np";
         else if (peopleOn()) toPeople();
+        else if (spotReach()) zone = "spot";
         else if (cards.length) zone = "shelf";
         else { zone = "grid"; g = Math.min(GRID_COLS, gridEls.length) - 1; }
       }
@@ -2623,7 +2744,11 @@
       else if (dx && !isHead()) {
         // moving across the names only moves the outline; OK picks (you have to click to select), so passing a name on the way to Sleep timer changes nothing
         pi = Math.max(0, Math.min(PEOPLE.length - 1, pi + dx));
-      } else if (dy > 0) zone = NIGHT && npReach() ? "np" : cards.length ? "shelf" : "grid";
+      } else if (dy > 0) {
+        if (NIGHT && npReach()) zone = "np";
+        else if (spotReach()) { zone = "spot"; spI = 0; }
+        else zone = cards.length ? "shelf" : "grid";
+      }
     } else if (zone === "shelf") {
       if (dx < 0 && s === 0 && NIGHT && npReach()) { zone = "np"; npI = 2; }
       else if (dx) s = Math.max(0, Math.min(shelfEls.length - 1, s + dx));
@@ -2640,7 +2765,12 @@
         var nx = g + dx;
         if (nx >= 0 && nx < gridEls.length && Math.floor(nx / GRID_COLS) === row) g = nx;
       } else if (dy < 0 && row === 0) {
-        if (cards.length) zone = "shelf";
+        if (spotReach()) {   // land on the nearest button or cover above the app
+          var gb = gridEls[g].getBoundingClientRect(), best = 0, bd = 1e9;
+          spEls.forEach(function (e2, k) { var r2 = e2.getBoundingClientRect(), d2 = Math.abs(r2.left + r2.width / 2 - (gb.left + gb.width / 2)); if (d2 < bd) { bd = d2; best = k; } });
+          spI = best; zone = "spot";
+        }
+        else if (cards.length) zone = "shelf";
         else if (npReach()) {
           if (AMBIENT_MUSIC && music) {
             ambientOpen = true;
@@ -2747,6 +2877,7 @@
     if (zone === "menu") { setSleep(SLEEP_CHOICES[menuI]); paintFocus(); return; }
     if (zone === "inputs") { doInputMenu(); paintFocus(); return; }
     if (zone === "ambient") { ambPress(); return; }
+    if (zone === "spot") { spotActivate(); return; }
     if (zone === "np") { npPress(); return; }
     if (zone === "pmenu") {
       if (plift) { dropPeople(); return; }
@@ -4428,6 +4559,12 @@
       if (document.fonts) document.fonts.load("300 10px Antonio").then(function () { glassShown = ""; clock(); });
       refreshWeather();
       setInterval(refreshWeather, WX_EVERY * 60000);
+    }
+    if (SCENIC && (WXC_ON || SPOT_ON)) {
+      document.documentElement.classList.add("cards-wanted");
+      if (WXC_ON) { refreshWxCard(); setInterval(refreshWxCard, 600000); }
+      if (SPOT_ON) { refreshSpot(); setInterval(refreshSpot, 15000); }
+      document.addEventListener("visibilitychange", function () { if (!document.hidden) { refreshWxCard(); refreshSpot(); } });
     }
     if (SUBWAY_ON) {
       refreshSubway();

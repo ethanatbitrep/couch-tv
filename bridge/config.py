@@ -478,4 +478,5 @@ def public():
             "tvs": [{"id": t["id"], "name": t["name"], "quick": quick_for(t),
                      "picture_modes": [m["name"] for m in picture_modes(t.get("picture"))]} for t in TVS],
             "default_tv": DEFAULT_TV, "ask": {"enabled": ASK_ENABLED}, "phone_remote": PHONE_REMOTE,
-            "subway": {"enabled": bool((CONFIG.get("subway") or {}).get("stations"))}}
+            "subway": {"enabled": bool((CONFIG.get("subway") or {}).get("stations"))},
+            "spotify": {"enabled": bool((CONFIG.get("spotify") or {}).get("client_id"))}}
