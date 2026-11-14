@@ -481,7 +481,9 @@ are `POST /api/key` with `previous`, `play_pause` and `next`.
  "art": "https://is1-ssl.mzstatic.com/.../600x600bb.jpg", "position": 42.5, "duration": 215.0}}
 ```
 
-### Spotify: `GET /api/spotify`, `POST /api/spotify/play`, `POST /api/spotify/control`
+### Spotify: `GET /api/spotify`, `GET /api/spotify/devices`, `POST /api/spotify/play`, `POST /api/spotify/control`
+`GET /api/spotify/devices` answers `{"ok": true, "speaker": "Echo" or null, "devices": [{"name", "type", "active"}]}`:
+what Spotify can play on right now, to find a name for `spotify.speaker`.
 Only with a `spotify` section in config.json ([docs/SPOTIFY.md](../docs/SPOTIFY.md)). `GET /api/spotify`
 always answers `ok: true`; when Spotify is not set up or not signed in it says `connected: false` with a
 plain `reason`. `recent` is the last songs played on the account (any device), newest first, each once,

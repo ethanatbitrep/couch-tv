@@ -2194,6 +2194,16 @@ async def h_spotify_play(request):
     return ok(device=got.get("device"), launched=bool(got.get("launched")))
 
 
+async def h_spotify_devices(request):
+    """GET /api/spotify/devices: what Spotify can play on right now (to find a speaker's name)."""
+    if not spotify.ENABLED:
+        raise ApiError(404, "Spotify is not set up (docs/SPOTIFY.md).")
+    got = await spotify.devices()
+    if not got.get("ok"):
+        raise ApiError(503, got.get("error") or "Spotify did not answer.")
+    return ok(speaker=got.get("speaker"), devices=got.get("devices"))
+
+
 async def h_spotify_control(request):
     data = await body(request)
     action = str(data.get("action") or "")
@@ -3622,6 +3632,7 @@ def make_app():
     r.add_get("/api/weather/detail", h_weather_detail)
     r.add_get("/api/subway", h_subway)
     r.add_get("/api/spotify", h_spotify)
+    r.add_get("/api/spotify/devices", h_spotify_devices)
     r.add_post("/api/spotify/play", h_spotify_play)
     r.add_post("/api/spotify/control", h_spotify_control)
     r.add_get("/spotify/login", h_spotify_login)

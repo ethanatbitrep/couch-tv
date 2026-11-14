@@ -126,6 +126,12 @@ Spotify login (this replaces your sign-in on the bridge).
 - **It plays on the wrong device:** add `"device_name"` with part of the TV's name as Spotify shows it
   (in the Spotify app on your phone, tap the speaker icon to see the names), for example
   `"spotify": {"client_id": "...", "device_name": "Samsung"}`, then restart the bridge.
+- **Music stops when the home comes back** (a Samsung stops Spotify as soon as another app is in
+  front): play on a speaker instead. Link Spotify to the speaker (for an Echo, in the Alexa app:
+  More, Settings, Music and Podcasts, Spotify), play something on it once, then see its name with
+  `curl -H "Authorization: Bearer <pairing key>" http://127.0.0.1:5400/api/spotify/devices`. Add
+  `"speaker"` with part of that name, for example `"spotify": {"client_id": "...", "speaker": "Echo"}`,
+  and restart the bridge. The home then stays on screen and the TV's Spotify row drives the speaker.
 - **"Spotify's sign-in ran out":** do Step 4 again.
 - **"Premium is needed":** Spotify only allows starting and controlling music for Premium accounts.
 - **To switch it off:** remove the `"spotify"` part from `config.json`, delete

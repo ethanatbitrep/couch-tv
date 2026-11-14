@@ -46,6 +46,9 @@ SCOPES = "user-read-recently-played user-read-playback-state user-modify-playbac
 _cfg = config.CONFIG.get("spotify") or {}
 CLIENT_ID = str(_cfg.get("client_id") or "").strip()
 DEVICE_NAME = str(_cfg.get("device_name") or "").strip()
+# a speaker to play on instead of the TV (an Echo, a Sonos): part of its name in Spotify's device list.
+# Set, the home stays on screen while music plays, and Spotify is never opened on the TV.
+SPEAKER = str(_cfg.get("speaker") or "").strip()
 ENABLED = bool(CLIENT_ID)
 PORT = int(os.environ.get("PORT") or config.BRIDGE["port"])
 # Spotify only takes loopback redirects as an explicit IP address, never "localhost".
@@ -412,7 +415,10 @@ def play_body(uri=None, context_uri=None):
 
 
 async def find_tv(launch=None):
-    """-> (device or None, launched). Opens Spotify on the TV with `launch` when it is not listed."""
+    """-> (device or None, launched). Opens Spotify on the TV with `launch` when it is not listed.
+    With a speaker set, it plays there and never opens Spotify on the TV."""
+    if SPEAKER:
+        return pick_device(await _devices(), SPEAKER), False
     dev = pick_device(await _devices())
     if dev or launch is None:
         return dev, False
@@ -440,6 +446,10 @@ async def play(uri=None, context_uri=None, launch=None):
         return {"ok": False, "error": "context_uri must be a Spotify album, playlist, artist or show"}
     try:
         dev, launched = await find_tv(launch)
+        if not dev and SPEAKER:
+            return {"ok": False, "launched": False, "error": (
+                f'Spotify cannot see "{SPEAKER}" right now. Play something on it once (for an Echo, say '
+                '"Alexa, play Spotify"), check Spotify is linked to it, then try again.')}
         if not dev:
             name = f'"{DEVICE_NAME}"' if DEVICE_NAME else "the TV"
             return {"ok": False, "launched": launched, "error": (
@@ -465,6 +475,17 @@ async def play(uri=None, context_uri=None, launch=None):
     except Exception as e:
         log.warning("Spotify play: %s", e)
         return {"ok": False, "error": str(e) if str(e).startswith("Could not") else f"Could not reach Spotify ({e})."}
+
+
+async def devices():
+    """The devices Spotify can play on right now, to find a speaker's name. -> {"ok", "devices": [...]}"""
+    try:
+        found = await _devices()
+    except NotConnected as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "speaker": SPEAKER or None, "devices": [
+        {"name": d.get("name"), "type": d.get("type"), "active": bool(d.get("is_active"))}
+        for d in found if isinstance(d, dict)]}
 
 
 async def control(action, launch=None):

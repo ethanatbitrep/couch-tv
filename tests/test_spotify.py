@@ -276,6 +276,53 @@ class TestDevices(Base):
         self.assertEqual(spotify.pick_device(devs, "")["id"], "b")
 
 
+class TestSpeaker(Base):
+    """spotify.speaker: play on an Echo or another speaker, never opening Spotify on the TV."""
+    ECHO = {"id": "e1", "name": "Ethan's Echo Dot", "type": "Speaker"}
+
+    def setUp(self):
+        super().setUp()
+        self._was = spotify.SPEAKER
+        spotify.SPEAKER = "echo"
+
+    def tearDown(self):
+        spotify.SPEAKER = self._was
+        super().tearDown()
+
+    def test_plays_on_speaker_not_tv(self):
+        self.sign_in()
+        f = self.fake({("GET", "/me/player/devices"): [(200, {"devices": TestDevices.DEVICES + [self.ECHO]})],
+                       ("PUT", "/me/player/play"): [(204, None)]})
+        launched = []
+
+        async def launch():
+            launched.append(1)
+        got = run(spotify.play(uri="spotify:track:t1", launch=launch))
+        self.assertEqual(got, {"ok": True, "device": "Ethan's Echo Dot", "launched": False})
+        self.assertEqual(launched, [])
+        put = [c for c in f.calls if c["path"] == "/me/player/play"][0]
+        self.assertEqual(put["query"], {"device_id": "e1"})
+
+    def test_speaker_missing_never_opens_tv(self):
+        self.sign_in()
+        self.fake({("GET", "/me/player/devices"): [(200, {"devices": TestDevices.DEVICES})]})
+        launched = []
+
+        async def launch():
+            launched.append(1)
+        got = run(spotify.play(uri="spotify:track:t1", launch=launch))
+        self.assertFalse(got["ok"])
+        self.assertIn("Alexa", got["error"])
+        self.assertEqual(launched, [])
+
+    def test_device_list(self):
+        self.sign_in()
+        self.fake({("GET", "/me/player/devices"): [(200, {"devices": [TestDevices.DEVICES[0], self.ECHO]})]})
+        got = run(spotify.devices())
+        self.assertEqual(got["speaker"], "echo")
+        self.assertEqual([d["name"] for d in got["devices"]], ["Phone", "Ethan's Echo Dot"])
+
+
 class TestPlay(Base):
     def test_play_when_tv_listed(self):
         self.sign_in()

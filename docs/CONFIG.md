@@ -464,6 +464,10 @@ Off unless `client_id` is set.
 - `client_id`: your Spotify app's Client ID (not the secret; none is needed).
 - `device_name` [none]: part of the TV's name in Spotify's device list, when the bridge should not
   guess. Left out, it picks a device of type TV, or one with "Samsung" in its name.
+- `speaker` [none]: part of a speaker's name in Spotify's device list (an Echo, a Sonos), to play
+  there instead of on the TV. The home stays on screen while music plays, and Spotify is never
+  opened on the TV. Use it on TVs that stop Spotify when another app is in front, as Samsungs do.
+  `GET /api/spotify/devices` lists the names Spotify can see.
 
 Sign in once at `http://127.0.0.1:5400/spotify/login` on the bridge computer itself. The answer is at
 `GET /api/spotify` ([bridge/API.md](../bridge/API.md)).
