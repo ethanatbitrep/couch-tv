@@ -2120,6 +2120,82 @@ async def h_subway(request):
     return ok(**got)
 
 
+# ---------- Spotify (config.json "spotify", bridge/spotify.py, docs/SPOTIFY.md) ----------
+import spotify  # noqa: E402
+
+
+def _plain_page(title, text, status=200):
+    """A small page for the one-time Spotify sign-in, in the browser on the bridge computer."""
+    import html
+    body = (f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>"
+            f"<title>{html.escape(title)}</title><body style='font:18px/1.5 system-ui,sans-serif;"
+            f"max-width:36em;margin:4em auto;padding:0 1em'><h1>{html.escape(title)}</h1>"
+            f"<p>{html.escape(text)}</p></body>")
+    return web.Response(text=body, content_type="text/html", status=status,
+                        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+async def h_spotify_login(request):
+    """GET /spotify/login: starts the sign-in. Only from the bridge computer itself (loopback)."""
+    try:
+        url = spotify.start_login(request.remote)
+    except spotify.LoginError as e:
+        return _plain_page("Spotify is not connected", str(e), e.status)
+    raise web.HTTPFound(url, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+async def h_spotify_callback(request):
+    """GET /spotify/callback: Spotify sends the browser back here with a code (loopback only)."""
+    try:
+        await spotify.finish_login(request.remote, request.query)
+    except spotify.LoginError as e:
+        return _plain_page("Spotify is not connected", str(e), e.status)
+    except Exception as e:
+        log.warning("Spotify sign-in failed: %s", e)
+        return _plain_page("Spotify is not connected", f"Could not reach Spotify ({e}). Try again.", 502)
+    return _plain_page("Spotify is connected", "Spotify is connected. You can close this tab.")
+
+
+def _spotify_launcher():
+    """Opens Spotify on the TV this request is for (Samsung: Tizen id 3201606009684, bridge/apps.py)."""
+    t = TVS[_current.get()]
+
+    async def launch():
+        await t.launch_package(apps.BY_ID["spotify"]["package"])
+    return launch
+
+
+async def h_spotify(request):
+    return ok(**await spotify.summary())
+
+
+async def h_spotify_play(request):
+    data = await body(request)
+    uri = data.get("uri") or None
+    context_uri = data.get("context_uri") or None
+    if not spotify.ENABLED:
+        raise ApiError(404, "Spotify is not set up (docs/SPOTIFY.md).")
+    got = await spotify.play(uri=str(uri) if uri else None, context_uri=str(context_uri) if context_uri else None,
+                             launch=_spotify_launcher())
+    if not got.get("ok"):
+        raise ApiError(503, got.get("error") or "Spotify did not start playing.")
+    record_action(request, "spotify_play", {"uri": uri, "context_uri": context_uri}, True)
+    return ok(device=got.get("device"), launched=bool(got.get("launched")))
+
+
+async def h_spotify_control(request):
+    data = await body(request)
+    action = str(data.get("action") or "")
+    if not spotify.ENABLED:
+        raise ApiError(404, "Spotify is not set up (docs/SPOTIFY.md).")
+    if action not in spotify.ACTIONS:
+        raise ApiError(400, f"action must be one of {', '.join(spotify.ACTIONS)}")
+    got = await spotify.control(action, launch=_spotify_launcher())
+    if not got.get("ok"):
+        raise ApiError(503, got.get("error") or "Spotify did not answer.")
+    return ok()
+
+
 # ---------- app order, arranged from the phone ----------
 # The TV home reports the apps it has (home-apps.<tv>.json, in its default order); the phone saves
 # the order and where the "More apps" line sits (app-order.<tv>.json). Apps above the line show in
@@ -3533,6 +3609,11 @@ def make_app():
     r.add_post("/api/who", h_who_set)
     r.add_get("/api/weather", h_weather)
     r.add_get("/api/subway", h_subway)
+    r.add_get("/api/spotify", h_spotify)
+    r.add_post("/api/spotify/play", h_spotify_play)
+    r.add_post("/api/spotify/control", h_spotify_control)
+    r.add_get("/spotify/login", h_spotify_login)
+    r.add_get("/spotify/callback", h_spotify_callback)
     r.add_get("/api/config", h_config)
     r.add_post("/api/home-apps", h_home_apps)
     r.add_get("/api/app-order", h_app_order_get)

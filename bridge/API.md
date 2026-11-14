@@ -481,6 +481,30 @@ are `POST /api/key` with `previous`, `play_pause` and `next`.
  "art": "https://is1-ssl.mzstatic.com/.../600x600bb.jpg", "position": 42.5, "duration": 215.0}}
 ```
 
+### Spotify: `GET /api/spotify`, `POST /api/spotify/play`, `POST /api/spotify/control`
+Only with a `spotify` section in config.json ([docs/SPOTIFY.md](../docs/SPOTIFY.md)). `GET /api/spotify`
+always answers `ok: true`; when Spotify is not set up or not signed in it says `connected: false` with a
+plain `reason`. `recent` is the last songs played on the account (any device), newest first, each once,
+up to 8; `context_uri` is the album or playlist it was played from, or `null`. `art` is the cover about
+300 px wide. `now` is what Spotify is playing on any device, or `null`.
+```json
+{"ok": true, "connected": true,
+ "recent": [{"name": "Golden Hour", "artists": "JVKE", "album": "this is what ____ feels like",
+             "art": "https://i.scdn.co/image/...", "uri": "spotify:track:...", "context_uri": "spotify:album:..."}],
+ "now": {"name": "Golden Hour", "artists": "JVKE", "art": "https://i.scdn.co/image/...", "is_playing": true,
+         "progress_ms": 42500, "duration_ms": 209000, "uri": "spotify:track:...",
+         "device": {"name": "Samsung 7 Series", "type": "TV"}}}
+```
+`POST /api/spotify/play` with `{"uri": "spotify:track:..."}`, `{"context_uri": "spotify:album:..."}` or
+both (an album or playlist then starts at that song), or `{}` to carry on, plays on the TV. When the TV
+is not in Spotify's device list, the bridge opens Spotify on the TV and waits up to 20 seconds for it.
+Answers `{"ok": true, "device": "Samsung 7 Series", "launched": true}`, or 503 with a plain `error`.
+`POST /api/spotify/control` with `{"action": "play" | "pause" | "next" | "previous"}` acts on the device
+Spotify is playing on (`play` with nothing active carries on on the TV).
+
+The one-time sign-in is `GET /spotify/login` (and Spotify's return to `GET /spotify/callback`). Neither
+needs the pairing key, and both answer only the bridge computer itself (a loopback address).
+
 ### `GET /api/continue`
 "Keep watching" for one TV (`?tv=`) and one person (`?who=`, else the person on that TV's couch):
 one card per show (its latest episode), newest first, at most 10, nothing older than 30 days.

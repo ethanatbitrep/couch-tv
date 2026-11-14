@@ -446,6 +446,27 @@ Needs the bridge: with no bridge, or no `subway` section, there is no card.
 Preview it without a bridge: `tv-home/web/index.html?mock=1&subway=1`. The bridge's answer is at
 `GET /api/subway`.
 
+## Spotify (optional, `spotify`)
+
+Recently played songs, what is playing now, and playing a song on the TV through Spotify Connect (the
+bridge opens Spotify on the TV first if it is not open). Needs Spotify Premium, the bridge, and your own
+free app on Spotify's developer site: the whole setup, in plain words, is in [SPOTIFY.md](SPOTIFY.md).
+Off unless `client_id` is set.
+
+```json
+"spotify": {
+  "client_id": "the Client ID from developer.spotify.com/dashboard",
+  "device_name": "Samsung"
+}
+```
+
+- `client_id`: your Spotify app's Client ID (not the secret; none is needed).
+- `device_name` [none]: part of the TV's name in Spotify's device list, when the bridge should not
+  guess. Left out, it picks a device of type TV, or one with "Samsung" in its name.
+
+Sign in once at `http://127.0.0.1:5400/spotify/login` on the bridge computer itself. The answer is at
+`GET /api/spotify` ([bridge/API.md](../bridge/API.md)).
+
 ## Everything else
 
 **Never forward a port to the bridge.** The bridge is built for your home network only. Never expose it
